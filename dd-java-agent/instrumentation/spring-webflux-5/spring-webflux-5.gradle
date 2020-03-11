@@ -10,6 +10,14 @@ muzzle {
     module = "spring-webflux"
     versions = "[5.0.0.RELEASE,)"
     assertInverse = true
+    extraDependency "io.projectreactor.ipc:reactor-netty:0.7.0.RELEASE"
+  }
+
+  pass {
+    group = "io.projectreactor.ipc"
+    module = "reactor-netty"
+    versions = "[0.7.0.RELEASE,)"
+    extraDependency "org.springframework:spring-webflux:5.0.0.RELEASE"
   }
 }
 
@@ -24,13 +32,8 @@ testSets {
 }
 
 dependencies {
-  // We use helpers from this project
-  main_java8CompileOnly project(':dd-java-agent:instrumentation:reactor-core-3.1')
   main_java8CompileOnly group: 'org.springframework', name: 'spring-webflux', version: '5.0.0.RELEASE'
-
-  // We are using utils class from reactor-core instrumentation.
-  // TODO: It is unclear why we need to use `compile` here (instead of 'compileOnly')
-  compile project(':dd-java-agent:instrumentation:reactor-core-3.1')
+  main_java8CompileOnly group: 'io.projectreactor.ipc', name: 'reactor-netty', version: '0.7.0.RELEASE'
 
   testCompile project(':dd-java-agent:instrumentation:trace-annotation')
   testCompile project(':dd-java-agent:instrumentation:netty-4.1')
