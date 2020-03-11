@@ -7,7 +7,6 @@ import static datadog.trace.instrumentation.springwebflux.server.SpringWebfluxHt
 
 import datadog.trace.bootstrap.instrumentation.api.AgentScope;
 import datadog.trace.bootstrap.instrumentation.api.AgentSpan;
-import datadog.trace.instrumentation.reactor.core.ReactorCoreAdviceUtils;
 import java.util.function.Function;
 import net.bytebuddy.asm.Advice;
 import org.reactivestreams.Publisher;

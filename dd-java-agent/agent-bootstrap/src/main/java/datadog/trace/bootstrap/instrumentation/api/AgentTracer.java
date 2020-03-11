@@ -259,8 +259,8 @@ public class AgentTracer {
     public void close(final boolean closeContinuationScope) {}
   }
 
-  static class NoopTraceScope implements TraceScope {
-    static final NoopTraceScope INSTANCE = new NoopTraceScope();
+  public static class NoopTraceScope implements TraceScope {
+    public static final NoopTraceScope INSTANCE = new NoopTraceScope();
 
     @Override
     public Continuation capture() {
