@@ -1,7 +1,11 @@
 import datadog.trace.agent.test.AgentTestRunner
+import datadog.trace.agent.test.asserts.ListWriterAssert
 import datadog.trace.api.Trace
+import datadog.trace.bootstrap.instrumentation.api.AgentScope
 import datadog.trace.bootstrap.instrumentation.api.AgentSpan
 import datadog.trace.bootstrap.instrumentation.api.Tags
+import groovy.transform.stc.ClosureParams
+import groovy.transform.stc.SimpleType
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
@@ -10,6 +14,7 @@ import spock.lang.Shared
 
 import java.time.Duration
 
+import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activateSpan
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.startSpan
 
 class ReactorCoreTest extends AgentTestRunner {
@@ -19,7 +24,9 @@ class ReactorCoreTest extends AgentTestRunner {
   @Shared
   def addOne = { i -> addOneFunc(i) }
   @Shared
-  def throwException = { throw new RuntimeException(EXCEPTION_MESSAGE) }
+  def throwException = {
+    throw new RuntimeException(EXCEPTION_MESSAGE)
+  }
 
   def "Publisher '#name' test"() {
     when:
@@ -28,8 +35,7 @@ class ReactorCoreTest extends AgentTestRunner {
     then:
     result == expected
     and:
-    assertTraces(1) {
-      def publisherParentSpanIndex = workSpans + 1
+    sortAndAssertTraces(1) {
       trace(0, workSpans + 2) {
         span(0) {
           resourceName "trace-parent"
@@ -40,23 +46,23 @@ class ReactorCoreTest extends AgentTestRunner {
             defaultTags()
           }
         }
-        for (int i = 0; i < workSpans; i++) {
-          span(i + 1) {
-            resourceName "addOne"
-            operationName "addOne"
-            childOf(span(publisherParentSpanIndex))
-            tags {
-              "$Tags.COMPONENT" "trace"
-              defaultTags()
-            }
-          }
-        }
-        span(publisherParentSpanIndex) {
+        span(1) {
           resourceName "publisher-parent"
           operationName "publisher-parent"
           childOf(span(0))
           tags {
             defaultTags()
+          }
+        }
+        for (int i = 0; i < workSpans; i++) {
+          span(i + 2) {
+            resourceName "addOne"
+            operationName "addOne"
+            childOf(span(1))
+            tags {
+              "$Tags.COMPONENT" "trace"
+              defaultTags()
+            }
           }
         }
       }
@@ -84,8 +90,50 @@ class ReactorCoreTest extends AgentTestRunner {
     def exception = thrown RuntimeException
     exception.message == EXCEPTION_MESSAGE
     and:
-    assertTraces(1) {
+    sortAndAssertTraces(1) {
       trace(0, 2) {
+        span(0) {
+          resourceName "trace-parent"
+          operationName "trace-parent"
+          parent()
+          errored true
+          tags {
+            "$Tags.COMPONENT" "trace"
+            errorTags(RuntimeException, EXCEPTION_MESSAGE)
+            defaultTags()
+          }
+        }
+        span(1) {
+          resourceName "publisher-parent"
+          operationName "publisher-parent"
+          childOf(span(0))
+          // MonoError and FluxError are both Fuseable.ScalarCallable which we cannot wrap without
+          // causing a lot of problems in other places where we integrate with reactor, like webflux
+          //          errored true
+          //          tags {
+          //            errorTags(RuntimeException, EXCEPTION_MESSAGE)
+          //            defaultTags()
+          //          }
+        }
+      }
+    }
+
+    where:
+    name   | publisher
+    "mono" | Mono.error(new RuntimeException(EXCEPTION_MESSAGE))
+    "flux" | Flux.error(new RuntimeException(EXCEPTION_MESSAGE))
+  }
+
+  def "Publisher step '#name' test"() {
+    when:
+    runUnderTrace(publisher)
+
+    then:
+    def exception = thrown RuntimeException
+    exception.message == EXCEPTION_MESSAGE
+    and:
+    sortAndAssertTraces(1) {
+      trace(0, workSpans + 2) {
         span(0) {
           resourceName "trace-parent"
           operationName "trace-parent"
@@ -107,56 +155,15 @@ class ReactorCoreTest extends AgentTestRunner {
             defaultTags()
           }
         }
-      }
-    }
-
-    where:
-    name   | publisher
-    "mono" | Mono.error(new RuntimeException(EXCEPTION_MESSAGE))
-    "flux" | Flux.error(new RuntimeException(EXCEPTION_MESSAGE))
-  }
-
-  def "Publisher step '#name' test"() {
-    when:
-    runUnderTrace(publisher)
-
-    then:
-    def exception = thrown RuntimeException
-    exception.message == EXCEPTION_MESSAGE
-    and:
-    assertTraces(1) {
-      trace(0, workSpans + 2) {
-        def publisherParentSpanIndex = workSpans + 1
-        span(0) {
-          resourceName "trace-parent"
-          operationName "trace-parent"
-          parent()
-          errored true
-          tags {
-            "$Tags.COMPONENT" "trace"
-            errorTags(RuntimeException, EXCEPTION_MESSAGE)
-            defaultTags()
-          }
-        }
         for (int i = 0; i < workSpans; i++) {
-          span(i + 1) {
+          span(i + 2) {
             resourceName "addOne"
             operationName "addOne"
-            childOf(span(publisherParentSpanIndex))
+            childOf(span(1))
             tags {
               "$Tags.COMPONENT" "trace"
               defaultTags()
             }
-          }
-        }
-        span(publisherParentSpanIndex) {
-          resourceName "publisher-parent"
-          operationName "publisher-parent"
-          childOf(span(0))
-          errored true
-          tags {
-            errorTags(RuntimeException, EXCEPTION_MESSAGE)
-            defaultTags()
           }
         }
       }
@@ -203,29 +210,28 @@ class ReactorCoreTest extends AgentTestRunner {
 
   @Trace(operationName = "trace-parent", resourceName = "trace-parent")
   def runUnderTrace(def publisher) {
-    // This is important sequence of events:
-    // We have a 'trace-parent' that covers whole span and then we have publisher-parent that overs only
-    // operation to create publisher (and set its context).
-    // The expectation is that then publisher is executed under 'publisher-parent', not under 'trace-parent'
     final AgentSpan span = startSpan("publisher-parent")
-    publisher = ReactorCoreAdviceUtils.setPublisherSpan(publisher, span)
-    span.finish()
+    AgentScope scope = activateSpan(span, true)
+    scope.setAsyncPropagation(true)
+    try {
+      // Read all data from publisher
+      if (publisher instanceof Mono) {
+        return publisher.block()
+      } else if (publisher instanceof Flux) {
+        return publisher.toStream().toArray({ size -> new Integer[size] })
+      }
 
-    // Read all data from publisher
-    if (publisher instanceof Mono) {
-      return publisher.block()
-    } else if (publisher instanceof Flux) {
-      return publisher.toStream().toArray({ size -> new Integer[size] })
+      throw new RuntimeException("Unknown publisher: " + publisher)
+    } finally {
+      scope.close()
     }
-
-    throw new RuntimeException("Unknown publisher: " + publisher)
   }
 
   @Trace(operationName = "trace-parent", resourceName = "trace-parent")
   def cancelUnderTrace(def publisher) {
     final AgentSpan span = startSpan("publisher-parent")
-    publisher = ReactorCoreAdviceUtils.setPublisherSpan(publisher, span)
-    span.finish()
+    AgentScope scope = activateSpan(span, true)
+    scope.setAsyncPropagation(true)
 
     publisher.subscribe(new Subscriber<Integer>() {
       void onSubscribe(Subscription subscription) {
@@ -241,10 +247,31 @@ class ReactorCoreTest extends AgentTestRunner {
       void onComplete() {
       }
     })
+
+    scope.close()
   }
 
   @Trace(operationName = "addOne", resourceName = "addOne")
   def static addOneFunc(int i) {
     return i + 1
+  }
+
+  void sortAndAssertTraces(
+    final int size,
+    @ClosureParams(value = SimpleType, options = "datadog.trace.agent.test.asserts.ListWriterAssert")
+    @DelegatesTo(value = ListWriterAssert, strategy = Closure.DELEGATE_FIRST)
+    final Closure spec) {
+
+    TEST_WRITER.waitForTraces(size)
+
+    TEST_WRITER.each {
+      it.sort({
+        a, b ->
+          // Intentionally backward because asserts are sorted that way already
+          return b.resourceName <=> a.resourceName
+      })
+    }
+
+    assertTraces(size, spec)
   }
 }
