@@ -6,6 +6,6 @@ import reactor.core.publisher.Hooks;
 public class ReactorHooksAdvice {
   @Advice.OnMethodExit(suppress = Throwable.class)
   public static void postInit() {
-    Hooks.onEachOperator(ReactorHooksAdvice.class.getName(), ReactorTracing.operator());
+    Hooks.onEachOperator(ReactorTracing.class.getName(), ReactorTracing.operator());
   }
 }
