@@ -1,7 +1,7 @@
 package datadog.trace.instrumentation.springwebflux.client;
 
 import static datadog.trace.agent.tooling.ClassLoaderMatcher.hasClassesNamed;
-import static datadog.trace.agent.tooling.bytebuddy.matcher.DDElementMatchers.safeHasSuperType;
+import static datadog.trace.agent.tooling.bytebuddy.matcher.DDElementMatchers.extendsClass;
 import static java.util.Collections.singletonMap;
 import static net.bytebuddy.matcher.ElementMatchers.isMethod;
 import static net.bytebuddy.matcher.ElementMatchers.isPublic;
@@ -33,7 +33,7 @@ public class ReactorHttpClientInstrumentation extends Instrumenter.Default {
 
   @Override
   public ElementMatcher<? super TypeDescription> typeMatcher() {
-    return safeHasSuperType(named("reactor.ipc.netty.http.client.HttpClient"));
+    return extendsClass(named("reactor.ipc.netty.http.client.HttpClient"));
   }
 
   @Override
