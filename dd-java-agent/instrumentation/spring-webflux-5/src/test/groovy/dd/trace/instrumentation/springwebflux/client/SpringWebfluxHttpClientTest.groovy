@@ -6,7 +6,7 @@ import datadog.trace.api.DDSpanTypes
 import datadog.trace.api.DDTags
 import datadog.trace.bootstrap.instrumentation.api.Tags
 import datadog.trace.instrumentation.netty41.client.NettyHttpClientDecorator
-import datadog.trace.instrumentation.reactor.core.ReactorHooksAdvice
+import datadog.trace.instrumentation.reactor.core.ReactorTracing
 import datadog.trace.instrumentation.springwebflux.client.SpringWebfluxHttpClientDecorator
 import datadog.trace.instrumentation.springwebflux.client.WebClientTracingFilter
 import org.springframework.http.HttpMethod
@@ -27,7 +27,7 @@ class SpringWebfluxHttpClientTest extends HttpClientTest {
   @Override
   void setupBeforeTests() {
     super.setupBeforeTests()
-    Hooks.onEachOperator(ReactorHooksAdvice.tracingOperator())
+    Hooks.onEachOperator(ReactorTracing.operator())
   }
 
   @Override

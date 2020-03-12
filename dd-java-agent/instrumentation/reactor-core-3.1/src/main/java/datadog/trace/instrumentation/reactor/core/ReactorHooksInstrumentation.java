@@ -26,7 +26,7 @@ public final class ReactorHooksInstrumentation extends Instrumenter.Default {
   @Override
   public String[] helperClassNames() {
     return new String[] {
-      packageName + ".ReactorHooksAdvice", packageName + ".ReactorHooksAdvice$TracingSubscriber",
+      packageName + ".ReactorTracing", packageName + ".ReactorTracing$TracingSubscriber",
     };
   }
 
