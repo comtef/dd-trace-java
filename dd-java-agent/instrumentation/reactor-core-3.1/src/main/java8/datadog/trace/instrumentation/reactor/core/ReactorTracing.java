@@ -30,18 +30,10 @@ public class ReactorTracing {
         (scannable) -> {
           // Don't wrap ourselves, and ConnectableFlux causes an exception in early reactor versions
           // due to not having the correct super types for being handled by the LiftFunction
-          // operator, Fuseable.ScalarCallable causes errors to break on newer versions of reactor
+          // operator
           if (scannable instanceof TracingSubscriber) {
             return false;
-          } else if (scannable instanceof Fuseable.ScalarCallable) {
-            return false;
           } else if (scannable instanceof ConnectableFlux) {
-            return false;
-          }
-          // In reactor 3.1 some built in types are not Scannable, the object before we receive it
-          // is sent through Scannable.from(). When this is done if the object is not a Scannable
-          // then we will get one of 2 constant Scannables which are members of Scannable.Attr
-          if (scannable.getClass().getName().startsWith("reactor.core.Scannable$Attr$")) {
             return false;
           }
           return true;
