@@ -1,6 +1,5 @@
 import datadog.trace.agent.test.AgentTestRunner
 import datadog.trace.agent.test.utils.PortUtils
-import datadog.trace.agent.test.utils.TraceUtils
 import io.lettuce.core.ClientOptions
 import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulConnection
@@ -8,6 +7,8 @@ import io.lettuce.core.api.reactive.RedisReactiveCommands
 import reactor.core.scheduler.Schedulers
 import redis.embedded.RedisServer
 import spock.lang.Shared
+
+import static datadog.trace.agent.test.utils.TraceUtils.runUnderTrace
 
 class LettuceReactiveTest extends AgentTestRunner {
   public static final String HOST = "127.0.0.1"
@@ -60,7 +61,7 @@ class LettuceReactiveTest extends AgentTestRunner {
 
   def "blocking subscriber"() {
     when:
-    TraceUtils.runUnderTrace("test-parent") {
+    runUnderTrace("test-parent") {
       reactive.set("a", "1")
         .then(reactive.get("a")) // The get here is ending up in another trace
         .block()
@@ -76,7 +77,7 @@ class LettuceReactiveTest extends AgentTestRunner {
 
   def "async subscriber"() {
     when:
-    TraceUtils.runUnderTrace("test-parent") {
+    runUnderTrace("test-parent") {
       reactive.set("a", "1")
         .then(reactive.get("a")) // The get here is ending up in another trace
         .subscribe()
@@ -92,7 +93,7 @@ class LettuceReactiveTest extends AgentTestRunner {
 
   def "async subscriber with specific thread pool"() {
     when:
-    TraceUtils.runUnderTrace("test-parent") {
+    runUnderTrace("test-parent") {
       reactive.set("a", "1")
         .then(reactive.get("a")) // The get here is ending up in another trace
         .subscribeOn(Schedulers.elastic())
