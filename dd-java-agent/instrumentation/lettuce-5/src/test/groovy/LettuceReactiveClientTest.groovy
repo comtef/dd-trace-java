@@ -7,12 +7,14 @@ import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulConnection
 import io.lettuce.core.api.reactive.RedisReactiveCommands
 import io.lettuce.core.api.sync.RedisCommands
+import reactor.core.scheduler.Schedulers
 import redis.embedded.RedisServer
 import spock.lang.Shared
 import spock.util.concurrent.AsyncConditions
 
 import java.util.function.Consumer
 
+import static datadog.trace.agent.test.utils.TraceUtils.runUnderTrace
 import static datadog.trace.instrumentation.lettuce.LettuceInstrumentationUtil.AGENT_CRASHING_COMMAND_PREFIX
 
 class LettuceReactiveClientTest extends AgentTestRunner {
@@ -321,4 +323,52 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     }
   }
 
+  def "blocking subscriber"() {
+    when:
+    runUnderTrace("test-parent") {
+      reactiveCommands.set("a", "1")
+        .then(reactiveCommands.get("a")) // The get here is ending up in another trace
+        .block()
+    }
+    TEST_WRITER.waitForTraces(1)
+
+    def traces = TEST_WRITER.collect()
+
+    then:
+    traces.size() == 1
+    traces.get(0).size() == 3
+  }
+
+  def "async subscriber"() {
+    when:
+    runUnderTrace("test-parent") {
+      reactiveCommands.set("a", "1")
+        .then(reactiveCommands.get("a")) // The get here is ending up in another trace
+        .subscribe()
+    }
+    TEST_WRITER.waitForTraces(1)
+
+    def traces = TEST_WRITER.collect()
+
+    then:
+    traces.size() == 1
+    traces.get(0).size() == 3
+  }
+
+  def "async subscriber with specific thread pool"() {
+    when:
+    runUnderTrace("test-parent") {
+      reactiveCommands.set("a", "1")
+        .then(reactiveCommands.get("a")) // The get here is ending up in another trace
+        .subscribeOn(Schedulers.elastic())
+        .subscribe()
+    }
+    TEST_WRITER.waitForTraces(1)
+
+    def traces = TEST_WRITER.collect()
+
+    then:
+    traces.size() == 1
+    traces.get(0).size() == 3
+  }
 }
