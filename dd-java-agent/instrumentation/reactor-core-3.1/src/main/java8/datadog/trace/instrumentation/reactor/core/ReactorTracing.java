@@ -51,8 +51,13 @@ public class ReactorTracing {
     }
 
     Context context = delegate.currentContext();
-    final Optional<AgentSpan> maybeSpan = context.getOrEmpty(AgentSpan.class);
-    final AgentSpan span = maybeSpan.orElseGet(AgentTracer::activeSpan);
+    AgentSpan span = activeSpan();
+    if (span == null) {
+      final Optional<AgentSpan> maybeSpan = context.getOrEmpty(AgentSpan.class);
+      if (maybeSpan.isPresent()) {
+        span = maybeSpan.get();
+      }
+    }
     if (span == null) {
       return delegate;
     }
