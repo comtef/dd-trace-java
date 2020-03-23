@@ -336,8 +336,24 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    traces.size() == 1
-    traces.get(0).size() == 3
+    assertTraces(1) {
+      trace(0, 3) {
+        span(0) {
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "SHUTDOWN"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+      }
+    }
   }
 
   // TODO add span assertions
@@ -353,8 +369,24 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    traces.size() == 1
-    traces.get(0).size() == 3
+    assertTraces(1) {
+      trace(0, 3) {
+        span(0) {
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "SHUTDOWN"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+      }
+    }
   }
 
   // TODO add span assertions
@@ -371,7 +403,23 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    traces.size() == 1
-    traces.get(0).size() == 3
+    assertTraces(1) {
+      trace(0, 3) {
+        span(0) {
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "SHUTDOWN"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+      }
+    }
   }
 }
