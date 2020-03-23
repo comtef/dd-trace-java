@@ -39,18 +39,9 @@ class SpringWebfluxHttpClientTest extends HttpClientTest {
       .exchange()
       .doOnSuccessOrError { success, error ->
         blockUntilChildSpansFinished(1)
-        // The callback span is expected to be detached from the client trace, this however means we either have
-        // to have the reactor instrumentation not work in this case, breaking the lettuce flow expectations, or
-        // we can make this code conditional here to make the test pass
-//        if (hasParent) {
         callback?.call()
-//        }
       }
       .block()
-
-//    if (!hasParent) {
-//      callback?.call()
-//    }
 
     if (hasParent) {
       blockUntilChildSpansFinished(callback ? 3 : 2)
