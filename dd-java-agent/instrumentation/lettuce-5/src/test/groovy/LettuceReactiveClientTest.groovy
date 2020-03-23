@@ -323,6 +323,7 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     }
   }
 
+  // TODO add span assertions
   def "blocking subscriber"() {
     when:
     runUnderTrace("test-parent") {
@@ -339,6 +340,7 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     traces.get(0).size() == 3
   }
 
+  // TODO add span assertions
   def "async subscriber"() {
     when:
     runUnderTrace("test-parent") {
@@ -355,6 +357,7 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     traces.get(0).size() == 3
   }
 
+  // TODO add span assertions
   def "async subscriber with specific thread pool"() {
     when:
     runUnderTrace("test-parent") {

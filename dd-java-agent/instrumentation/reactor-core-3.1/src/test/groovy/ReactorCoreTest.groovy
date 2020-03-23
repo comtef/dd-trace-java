@@ -206,6 +206,50 @@ class ReactorCoreTest extends AgentTestRunner {
     "basic flux" | Flux.fromIterable([5, 6])
   }
 
+  def "Publisher chain spans have the correct parent for '#name'"() {
+    when:
+    runUnderTrace(publisher)
+
+    then:
+    assertTraces(1) {
+      trace(0, workSpans + 2) {
+        span(0) {
+          resourceName "trace-parent"
+          operationName "trace-parent"
+          parent()
+          tags {
+            "$Tags.COMPONENT" "trace"
+            defaultTags()
+          }
+        }
+        span(1) {
+          resourceName "publisher-parent"
+          operationName "publisher-parent"
+          childOf(span(0))
+          tags {
+            defaultTags()
+          }
+        }
+        for (int i = 0; i < workSpans; i++) {
+          span(i + 2) {
+            resourceName "addOne"
+            operationName "addOne"
+            childOf(span(1))
+            tags {
+              "$Tags.COMPONENT" "trace"
+              defaultTags()
+            }
+          }
+        }
+      }
+    }
+
+    where:
+    name         | workSpans | publisher
+    "basic mono" | 3         | Mono.just(1).map(addOne).map(addOne).then(Mono.just(1).map(addOne))
+    "basic flux" | 5         | Flux.fromIterable([5, 6]).map(addOne).map(addOne).then(Mono.just(1).map(addOne))
+  }
+
   @Trace(operationName = "trace-parent", resourceName = "trace-parent")
   def runUnderTrace(def publisher) {
     final AgentSpan span = startSpan("publisher-parent")
@@ -265,8 +309,7 @@ class ReactorCoreTest extends AgentTestRunner {
     TEST_WRITER.each {
       it.sort({
         a, b ->
-          // Intentionally backward because asserts are sorted that way already
-          return b.resourceName <=> a.resourceName
+          return a.startTime <=> b.startTime
       })
     }
 
