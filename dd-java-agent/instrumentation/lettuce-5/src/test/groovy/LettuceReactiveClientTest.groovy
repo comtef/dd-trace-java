@@ -1,7 +1,10 @@
 import datadog.trace.agent.test.AgentTestRunner
+import datadog.trace.agent.test.asserts.ListWriterAssert
 import datadog.trace.agent.test.utils.PortUtils
 import datadog.trace.api.DDSpanTypes
 import datadog.trace.bootstrap.instrumentation.api.Tags
+import groovy.transform.stc.ClosureParams
+import groovy.transform.stc.SimpleType
 import io.lettuce.core.ClientOptions
 import io.lettuce.core.RedisClient
 import io.lettuce.core.api.StatefulConnection
@@ -336,13 +339,39 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    assertTraces(1) {
+    sortAndAssertTraces(1) {
       trace(0, 3) {
         span(0) {
+          serviceName "unnamed-java-app"
+          operationName "test-parent"
+          resourceName "test-parent"
+          errored false
+
+          tags {
+            defaultTags()
+          }
+        }
+        span(1) {
+          childOf(span(0))
           serviceName "redis"
           operationName "redis.query"
           spanType DDSpanTypes.REDIS
-          resourceName "SHUTDOWN"
+          resourceName "SET"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+        span(2) {
+          childOf(span(0))
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "GET"
           errored false
 
           tags {
@@ -369,13 +398,39 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    assertTraces(1) {
+    sortAndAssertTraces(1) {
       trace(0, 3) {
         span(0) {
+          serviceName "unnamed-java-app"
+          operationName "test-parent"
+          resourceName "test-parent"
+          errored false
+
+          tags {
+            defaultTags()
+          }
+        }
+        span(1) {
+          childOf(span(0))
           serviceName "redis"
           operationName "redis.query"
           spanType DDSpanTypes.REDIS
-          resourceName "SHUTDOWN"
+          resourceName "SET"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+        span(2) {
+          childOf(span(0))
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "GET"
           errored false
 
           tags {
@@ -403,13 +458,39 @@ class LettuceReactiveClientTest extends AgentTestRunner {
     def traces = TEST_WRITER.collect()
 
     then:
-    assertTraces(1) {
+    sortAndAssertTraces(1) {
       trace(0, 3) {
         span(0) {
+          serviceName "unnamed-java-app"
+          operationName "test-parent"
+          resourceName "test-parent"
+          errored false
+
+          tags {
+            defaultTags()
+          }
+        }
+        span(1) {
+          childOf(span(0))
           serviceName "redis"
           operationName "redis.query"
           spanType DDSpanTypes.REDIS
-          resourceName "SHUTDOWN"
+          resourceName "SET"
+          errored false
+
+          tags {
+            "$Tags.COMPONENT" "redis-client"
+            "$Tags.SPAN_KIND" Tags.SPAN_KIND_CLIENT
+            "$Tags.DB_TYPE" "redis"
+            defaultTags()
+          }
+        }
+        span(2) {
+          childOf(span(0))
+          serviceName "redis"
+          operationName "redis.query"
+          spanType DDSpanTypes.REDIS
+          resourceName "GET"
           errored false
 
           tags {
@@ -421,5 +502,23 @@ class LettuceReactiveClientTest extends AgentTestRunner {
         }
       }
     }
+  }
+
+  void sortAndAssertTraces(
+    final int size,
+    @ClosureParams(value = SimpleType, options = "datadog.trace.agent.test.asserts.ListWriterAssert")
+    @DelegatesTo(value = ListWriterAssert, strategy = Closure.DELEGATE_FIRST)
+    final Closure spec) {
+
+    TEST_WRITER.waitForTraces(size)
+
+    TEST_WRITER.each {
+      it.sort({
+        a, b ->
+          return a.startTime <=> b.startTime
+      })
+    }
+
+    assertTraces(size, spec)
   }
 }
