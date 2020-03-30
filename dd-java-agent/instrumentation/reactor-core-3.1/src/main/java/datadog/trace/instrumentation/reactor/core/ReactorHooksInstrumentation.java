@@ -1,6 +1,9 @@
 package datadog.trace.instrumentation.reactor.core;
 
 import static java.util.Collections.singletonMap;
+import static net.bytebuddy.matcher.ElementMatchers.isMethod;
+import static net.bytebuddy.matcher.ElementMatchers.isPublic;
+import static net.bytebuddy.matcher.ElementMatchers.isStatic;
 import static net.bytebuddy.matcher.ElementMatchers.isTypeInitializer;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
@@ -32,6 +35,9 @@ public final class ReactorHooksInstrumentation extends Instrumenter.Default {
 
   @Override
   public Map<? extends ElementMatcher<? super MethodDescription>, String> transformers() {
-    return singletonMap(isTypeInitializer(), packageName + ".ReactorHooksAdvice");
+    return singletonMap(
+        isTypeInitializer()
+            .or(isMethod().and(isPublic()).and(isStatic()).and(named("resetOnEachOperator"))),
+        packageName + ".ReactorHooksAdvice");
   }
 }

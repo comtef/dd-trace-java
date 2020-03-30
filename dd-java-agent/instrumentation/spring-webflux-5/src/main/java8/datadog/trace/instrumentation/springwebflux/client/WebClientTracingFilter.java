@@ -42,13 +42,11 @@ public class WebClientTracingFilter implements ExchangeFilterFunction {
               (clientResponse, throwable) -> {
                 if (throwable != null) {
                   DECORATE.onError(span, throwable);
-                  DECORATE.beforeFinish(span);
-                  span.finish();
                 } else {
                   DECORATE.onResponse(span, clientResponse);
-                  DECORATE.beforeFinish(span);
-                  span.finish();
                 }
+                DECORATE.beforeFinish(span);
+                span.finish();
               })
           .doOnCancel(
               () -> {

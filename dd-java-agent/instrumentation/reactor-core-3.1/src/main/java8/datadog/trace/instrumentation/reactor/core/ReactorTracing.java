@@ -1,16 +1,13 @@
 package datadog.trace.instrumentation.reactor.core;
 
-import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activateSpan;
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activeScope;
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activeSpan;
 
-import datadog.trace.bootstrap.instrumentation.api.AgentScope;
 import datadog.trace.bootstrap.instrumentation.api.AgentSpan;
 import datadog.trace.bootstrap.instrumentation.api.AgentTracer;
 import datadog.trace.context.TraceScope;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
@@ -41,74 +38,80 @@ public class ReactorTracing {
         ReactorTracing::subscriber);
   }
 
+  public static class TracingLifter<O>
+      implements BiFunction<Scannable, CoreSubscriber<O>, CoreSubscriber<O>> {
+
+    private AgentSpan span;
+
+    public TracingLifter(final AgentSpan span) {
+      this.span = span;
+    }
+
+    @Override
+    public CoreSubscriber<O> apply(final Scannable scannable, final CoreSubscriber<O> delegate) {
+      if (delegate instanceof TracingSubscriber) {
+        return delegate;
+      }
+      // DirectProcessor doesn't always propagate signals upstream
+      if (delegate instanceof DirectProcessor) {
+        return delegate;
+      }
+
+      if (span == null) {
+        span = AgentTracer.noopSpan();
+      }
+
+      return null; // activate the span and then pass that scope to the tracing subscriber
+    }
+  }
+
   public static <T> CoreSubscriber<? super T> subscriber(
       final Scannable scannable, final CoreSubscriber<T> delegate) {
+    if (delegate instanceof TracingSubscriber) {
+      return delegate;
+    }
+    // DirectProcessor doesn't always propagate signals upstream
     if (delegate instanceof DirectProcessor) {
       return delegate;
     }
-    if (delegate instanceof Fuseable.ScalarCallable) {
-      return delegate;
-    }
 
-    Context context = delegate.currentContext();
     AgentSpan span = activeSpan();
     if (span == null) {
-      final Optional<AgentSpan> maybeSpan = context.getOrEmpty(AgentSpan.class);
-      if (maybeSpan.isPresent()) {
-        span = maybeSpan.get();
-      }
-    }
-    if (span == null) {
-      return delegate;
+      span = AgentTracer.noopSpan();
     }
 
-    try (final AgentScope scope = activateSpan(span, false)) {
-      if (context.getOrDefault(AgentSpan.class, null) != span) {
-        context = context.put(AgentSpan.class, span);
-      }
-      return new TracingSubscriber<>(delegate, context, activeScope());
-    }
+    return new TracingSubscriber<>(delegate, delegate.currentContext(), activeScope());
   }
 
   @Slf4j
   private static class TracingSubscriber<T>
       implements Subscription, CoreSubscriber<T>, Fuseable.QueueSubscription<T>, Scannable {
 
-    private final AtomicBoolean active = new AtomicBoolean(true);
     private final AtomicReference<TraceScope.Continuation> continuation = new AtomicReference<>();
 
     private final Subscriber<T> delegate;
     private final Context context;
-    private final TraceScope parentScope;
+    private TraceScope scope;
     private Subscription subscription;
 
     public TracingSubscriber(
-        final Subscriber<T> delegate, final Context context, final TraceScope parentScope) {
+        final Subscriber<T> delegate, final Context context, final TraceScope scope) {
       this.delegate = delegate;
       this.context = context;
-      this.parentScope = parentScope;
+      this.scope = scope != null ? scope : AgentTracer.NoopTraceScope.INSTANCE;
 
-      parentScope.setAsyncPropagation(true);
-      continuation.set(parentScope.capture());
+      this.scope.setAsyncPropagation(true);
+      continuation.set(this.scope.capture());
     }
 
     private TraceScope maybeScope() {
-      if (active.get()) {
-        final TraceScope.Continuation continuation =
-            this.continuation.getAndSet(parentScope.capture());
-        return continuation.activate();
-      } else {
-        return AgentTracer.NoopTraceScope.INSTANCE;
-      }
+      final TraceScope.Continuation continuation = this.continuation.getAndSet(scope.capture());
+      return continuation.activate();
     }
 
     private TraceScope maybeScopeAndDeactivate() {
-      if (active.getAndSet(false)) {
-        final TraceScope.Continuation continuation = this.continuation.getAndSet(null);
-        return continuation.activate();
-      } else {
-        return AgentTracer.NoopTraceScope.INSTANCE;
-      }
+      scope = AgentTracer.NoopTraceScope.INSTANCE;
+      return maybeScope();
     }
 
     /*

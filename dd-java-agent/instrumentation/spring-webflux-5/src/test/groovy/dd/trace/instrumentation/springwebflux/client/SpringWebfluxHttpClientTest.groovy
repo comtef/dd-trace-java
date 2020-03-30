@@ -37,7 +37,7 @@ class SpringWebfluxHttpClientTest extends HttpClientTest {
       .headers { h -> headers.forEach({ key, value -> h.add(key, value) }) }
       .uri(uri)
       .exchange()
-      .doOnSuccessOrError { success, error ->
+      .doAfterTerminate {
         blockUntilChildSpansFinished(1)
         callback?.call()
       }
