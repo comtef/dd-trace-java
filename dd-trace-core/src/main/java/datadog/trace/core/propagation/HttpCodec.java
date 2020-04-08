@@ -2,8 +2,8 @@ package datadog.trace.core.propagation;
 
 import datadog.trace.api.Config;
 import datadog.trace.bootstrap.instrumentation.api.AgentPropagation;
+import datadog.trace.core.CoreTracer;
 import datadog.trace.core.DDSpanContext;
-import datadog.trace.core.DDTracer;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -116,8 +116,8 @@ public class HttpCodec {
   static BigInteger validateUInt64BitsID(final String value, final int radix)
       throws IllegalArgumentException {
     final BigInteger parsedValue = new BigInteger(value, radix);
-    if (parsedValue.compareTo(DDTracer.TRACE_ID_MIN) < 0
-        || parsedValue.compareTo(DDTracer.TRACE_ID_MAX) > 0) {
+    if (parsedValue.compareTo(CoreTracer.TRACE_ID_MIN) < 0
+        || parsedValue.compareTo(CoreTracer.TRACE_ID_MAX) > 0) {
       throw new IllegalArgumentException(
           "ID out of range, must be between 0 and 2^64-1, got: " + value);
     }
