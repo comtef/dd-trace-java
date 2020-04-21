@@ -1,9 +1,6 @@
 package datadog.trace.instrumentation.reactor.core;
 
 import static java.util.Collections.singletonMap;
-import static net.bytebuddy.matcher.ElementMatchers.isMethod;
-import static net.bytebuddy.matcher.ElementMatchers.isPublic;
-import static net.bytebuddy.matcher.ElementMatchers.isStatic;
 import static net.bytebuddy.matcher.ElementMatchers.isTypeInitializer;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
@@ -29,15 +26,23 @@ public final class ReactorHooksInstrumentation extends Instrumenter.Default {
   @Override
   public String[] helperClassNames() {
     return new String[] {
-      packageName + ".ReactorTracing", packageName + ".ReactorTracing$TracingSubscriber",
+      packageName + ".TracingPublishers",
+      packageName + ".TracingPublishers$MonoTracingPublisher",
+      packageName + ".TracingPublishers$ParallelFluxTracingPublisher",
+      packageName + ".TracingPublishers$ConnectableFluxTracingPublisher",
+      packageName + ".TracingPublishers$GroupedFluxTracingPublisher",
+      packageName + ".TracingPublishers$FluxTracingPublisher",
+      packageName + ".TracingPublishers$FuseableMonoTracingPublisher",
+      packageName + ".TracingPublishers$FuseableParallelFluxTracingPublisher",
+      packageName + ".TracingPublishers$FuseableConnectableFluxTracingPublisher",
+      packageName + ".TracingPublishers$FuseableGroupedFluxTracingPublisher",
+      packageName + ".TracingPublishers$FuseableFluxTracingPublisher",
+      packageName + ".TracingSubscriber",
     };
   }
 
   @Override
   public Map<? extends ElementMatcher<? super MethodDescription>, String> transformers() {
-    return singletonMap(
-        isTypeInitializer()
-            .or(isMethod().and(isPublic()).and(isStatic()).and(named("resetOnEachOperator"))),
-        packageName + ".ReactorHooksAdvice");
+    return singletonMap(isTypeInitializer(), packageName + ".ReactorHooksAdvice");
   }
 }

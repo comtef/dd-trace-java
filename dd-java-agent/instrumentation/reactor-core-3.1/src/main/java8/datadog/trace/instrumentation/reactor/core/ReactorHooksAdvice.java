@@ -5,7 +5,7 @@ import reactor.core.publisher.Hooks;
 
 public class ReactorHooksAdvice {
   @Advice.OnMethodExit(suppress = Throwable.class)
-  public static void postInit() {
-    Hooks.onEachOperator(ReactorTracing.class.getName(), ReactorTracing.operator());
+  public static void postReset() {
+    Hooks.onEachOperator(TracingPublishers.class.getName(), TracingPublishers::wrap);
   }
 }
