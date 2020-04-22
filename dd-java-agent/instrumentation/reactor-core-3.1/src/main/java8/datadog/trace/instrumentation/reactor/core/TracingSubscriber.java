@@ -9,28 +9,27 @@ import datadog.trace.bootstrap.instrumentation.api.AgentSpan;
 import datadog.trace.bootstrap.instrumentation.api.AgentTracer;
 import datadog.trace.context.TraceScope;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
 import reactor.core.Scannable;
 import reactor.util.context.Context;
 
+@Slf4j
 public class TracingSubscriber<T>
     implements Subscription, CoreSubscriber<T>, Fuseable.QueueSubscription<T>, Scannable {
 
   private final AtomicReference<TraceScope.Continuation> continuation = new AtomicReference<>();
 
-  private final AgentSpan downstreamSpan;
   private final AgentSpan span;
   private final CoreSubscriber<T> delegate;
   private final Context context;
-  private TraceScope downstreamScope;
+  private final AgentSpan downstreamSpan;
   private Subscription subscription;
 
-  public TracingSubscriber(
-      final AgentSpan span,
-      final CoreSubscriber<T> delegate,
-      final TraceScope.Continuation continuation) {
+  public TracingSubscriber(final AgentSpan span, final CoreSubscriber<T> delegate) {
+    log.info("Creating subscriber on top of {}", delegate.toString());
     this.delegate = delegate;
     this.span = span;
     downstreamSpan =
@@ -38,12 +37,21 @@ public class TracingSubscriber<T>
             delegate.currentContext().getOrEmpty(AgentSpan.class).orElseGet(AgentTracer::noopSpan);
 
     try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
-      downstreamScope = activeScope();
+      final TraceScope downstreamScope = activeScope();
       downstreamScope.setAsyncPropagation(true);
+      continuation.set(activeScope().capture());
     }
-    this.continuation.set(continuation);
 
     context = this.delegate.currentContext().put(AgentSpan.class, this.span);
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    if (!continuation.get().getClass().getName().contains("Noop")) {
+      log.error(
+          "Subscriber collected without clearing it's continuation. "
+              + continuation.get().toString());
+    }
   }
 
   @Override
@@ -51,46 +59,47 @@ public class TracingSubscriber<T>
     return context;
   }
 
-  private TraceScope maybeScope() {
-    final TraceScope.Continuation continuation =
-        this.continuation.getAndSet(downstreamScope.capture());
-    return continuation.activate();
-  }
-
-  private TraceScope maybeScopeAndDeactivate() {
-    downstreamScope = noopTraceScope();
-    return maybeScope();
-  }
-
   @Override
   public void onSubscribe(final Subscription subscription) {
     this.subscription = subscription;
 
-    try (final TraceScope scope = maybeScope()) {
+    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+      log.info("onSubscribe() {}", toString());
+      scope.setAsyncPropagation(true);
       delegate.onSubscribe(this);
     }
   }
 
   @Override
   public void onNext(final T t) {
-    try (final TraceScope scope = maybeScope()) {
+    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+      log.info("onNext() {}", toString());
+      scope.setAsyncPropagation(true);
       delegate.onNext(t);
     }
   }
 
   @Override
   public void onError(final Throwable t) {
-    try (final TraceScope scope = maybeScopeAndDeactivate()) {
+    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+      log.info("onError() {}", toString());
+      scope.setAsyncPropagation(true);
+      span.setError(true);
+      span.addThrowable(t);
       delegate.onError(t);
-      downstreamSpan.setError(true);
-      downstreamSpan.addThrowable(t);
+    } finally {
+      continuation.getAndSet(noopTraceScope().capture()).activate().close();
     }
   }
 
   @Override
   public void onComplete() {
-    try (final TraceScope scope = maybeScopeAndDeactivate()) {
+    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+      log.info("onComplete() {}", toString());
+      scope.setAsyncPropagation(true);
       delegate.onComplete();
+    } finally {
+      continuation.getAndSet(noopTraceScope().capture()).activate().close();
     }
   }
 
@@ -101,6 +110,8 @@ public class TracingSubscriber<T>
   @Override
   public void request(final long n) {
     try (final AgentScope scope = activateSpan(span, false)) {
+      log.info("request() {}", toString());
+      scope.setAsyncPropagation(true);
       subscription.request(n);
     }
   }
@@ -108,7 +119,11 @@ public class TracingSubscriber<T>
   @Override
   public void cancel() {
     try (final AgentScope scope = activateSpan(span, false)) {
+      log.info("cancel() {}", toString());
+      scope.setAsyncPropagation(true);
       subscription.cancel();
+    } finally {
+      continuation.getAndSet(noopTraceScope().capture()).activate().close();
     }
   }
 

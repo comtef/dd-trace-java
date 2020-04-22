@@ -1,13 +1,11 @@
 package datadog.trace.instrumentation.reactor.core;
 
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activateSpan;
-import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activeScope;
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.activeSpan;
 import static datadog.trace.bootstrap.instrumentation.api.AgentTracer.noopSpan;
 
 import datadog.trace.bootstrap.instrumentation.api.AgentScope;
 import datadog.trace.bootstrap.instrumentation.api.AgentSpan;
-import datadog.trace.context.TraceScope;
 import java.util.function.Consumer;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -29,7 +27,7 @@ public class TracingPublishers {
     if (span == null) {
       span = noopSpan();
     }
-    log.debug("Lifting {} with span {}", delegate.getClass().getName(), span.toString());
+    log.debug("Lifting {} with span {}", delegate.getClass().getName(), span.getClass().getName());
 
     // based on Operators.LiftFunction.apply in reactor 3.3.4
     if (delegate instanceof Fuseable) {
@@ -66,20 +64,18 @@ public class TracingPublishers {
   public static class MonoTracingPublisher<T> extends Mono<T> {
     private final AgentSpan span;
     private final Mono<T> delegate;
-    private final TraceScope.Continuation continuation;
 
     public MonoTracingPublisher(final AgentSpan span, final Mono<T> delegate) {
       this.span = span;
       this.delegate = delegate;
-      continuation = activeScope().capture();
     }
 
     @Override
     public void subscribe(CoreSubscriber<? super T> actual) {
-      try (final TraceScope scope = continuation.activate()) {
+      try (final AgentScope scope = activateSpan(span, false)) {
         scope.setAsyncPropagation(true);
         if (!(actual instanceof TracingSubscriber)) {
-          actual = new TracingSubscriber<>(span, actual, activeScope().capture());
+          actual = new TracingSubscriber<>(span, actual);
         }
         delegate.subscribe(actual);
       }
@@ -89,12 +85,10 @@ public class TracingPublishers {
   public static class ParallelFluxTracingPublisher<T> extends ParallelFlux<T> {
     private final AgentSpan span;
     private final ParallelFlux<T> delegate;
-    private final TraceScope.Continuation continuation;
 
     public ParallelFluxTracingPublisher(final AgentSpan span, final ParallelFlux<T> delegate) {
       this.span = span;
       this.delegate = delegate;
-      continuation = activeScope().capture();
     }
 
     @Override
@@ -104,11 +98,11 @@ public class TracingPublishers {
 
     @Override
     protected void subscribe(final CoreSubscriber<? super T>[] subscribers) {
-      try (final TraceScope scope = continuation.activate()) {
+      try (final AgentScope scope = activateSpan(span, false)) {
         scope.setAsyncPropagation(true);
         for (CoreSubscriber<? super T> subscriber : subscribers) {
           if (!(subscriber instanceof TracingSubscriber)) {
-            subscriber = new TracingSubscriber<>(span, subscriber, activeScope().capture());
+            subscriber = new TracingSubscriber<>(span, subscriber);
           }
           delegate.subscribe(subscriber);
         }
@@ -119,13 +113,11 @@ public class TracingPublishers {
   public static class ConnectableFluxTracingPublisher<T> extends ConnectableFlux<T> {
     private final AgentSpan span;
     private final ConnectableFlux<T> delegate;
-    private final TraceScope.Continuation continuation;
 
     public ConnectableFluxTracingPublisher(
         final AgentSpan span, final ConnectableFlux<T> delegate) {
       this.span = span;
       this.delegate = delegate;
-      continuation = activeScope().capture();
     }
 
     @Override
@@ -137,10 +129,10 @@ public class TracingPublishers {
 
     @Override
     public void subscribe(CoreSubscriber<? super T> actual) {
-      try (final TraceScope scope = continuation.activate()) {
+      try (final AgentScope scope = activateSpan(span, false)) {
         scope.setAsyncPropagation(true);
         if (!(actual instanceof TracingSubscriber)) {
-          actual = new TracingSubscriber<>(span, actual, activeScope().capture());
+          actual = new TracingSubscriber<>(span, actual);
         }
         delegate.subscribe(actual);
       }
@@ -150,12 +142,10 @@ public class TracingPublishers {
   public static class GroupedFluxTracingPublisher<O, T> extends GroupedFlux<O, T> {
     private final AgentSpan span;
     private final GroupedFlux<O, T> delegate;
-    private final TraceScope.Continuation continuation;
 
     public GroupedFluxTracingPublisher(final AgentSpan span, final GroupedFlux<O, T> delegate) {
       this.span = span;
       this.delegate = delegate;
-      continuation = activeScope().capture();
     }
 
     @Override
@@ -165,10 +155,10 @@ public class TracingPublishers {
 
     @Override
     public void subscribe(CoreSubscriber<? super T> actual) {
-      try (final TraceScope scope = continuation.activate()) {
+      try (final AgentScope scope = activateSpan(span, false)) {
         scope.setAsyncPropagation(true);
         if (!(actual instanceof TracingSubscriber)) {
-          actual = new TracingSubscriber<>(span, actual, activeScope().capture());
+          actual = new TracingSubscriber<>(span, actual);
         }
         delegate.subscribe(actual);
       }
@@ -178,20 +168,18 @@ public class TracingPublishers {
   public static class FluxTracingPublisher<T> extends Flux<T> {
     private final AgentSpan span;
     private final Flux<T> delegate;
-    private final TraceScope.Continuation continuation;
 
     public FluxTracingPublisher(final AgentSpan span, final Flux<T> delegate) {
       this.span = span;
       this.delegate = delegate;
-      continuation = activeScope().capture();
     }
 
     @Override
     public void subscribe(CoreSubscriber<? super T> actual) {
-      try (final TraceScope scope = continuation.activate()) {
+      try (final AgentScope scope = activateSpan(span, false)) {
         scope.setAsyncPropagation(true);
         if (!(actual instanceof TracingSubscriber)) {
-          actual = new TracingSubscriber<>(span, actual, activeScope().capture());
+          actual = new TracingSubscriber<>(span, actual);
         }
         delegate.subscribe(actual);
       }
