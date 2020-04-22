@@ -40,6 +40,7 @@ public class TracingSubscriber<T>
       final TraceScope downstreamScope = activeScope();
       downstreamScope.setAsyncPropagation(true);
       continuation.set(activeScope().capture());
+      log.info("Created continuation {}", continuation.get());
     }
 
     context = this.delegate.currentContext().put(AgentSpan.class, this.span);
@@ -86,9 +87,8 @@ public class TracingSubscriber<T>
       scope.setAsyncPropagation(true);
       span.setError(true);
       span.addThrowable(t);
-      delegate.onError(t);
-    } finally {
       continuation.getAndSet(noopTraceScope().capture()).activate().close();
+      delegate.onError(t);
     }
   }
 
@@ -97,9 +97,8 @@ public class TracingSubscriber<T>
     try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
       log.info("onComplete() {}", toString());
       scope.setAsyncPropagation(true);
-      delegate.onComplete();
-    } finally {
       continuation.getAndSet(noopTraceScope().capture()).activate().close();
+      delegate.onComplete();
     }
   }
 
@@ -121,9 +120,8 @@ public class TracingSubscriber<T>
     try (final AgentScope scope = activateSpan(span, false)) {
       log.info("cancel() {}", toString());
       scope.setAsyncPropagation(true);
-      subscription.cancel();
-    } finally {
       continuation.getAndSet(noopTraceScope().capture()).activate().close();
+      subscription.cancel();
     }
   }
 

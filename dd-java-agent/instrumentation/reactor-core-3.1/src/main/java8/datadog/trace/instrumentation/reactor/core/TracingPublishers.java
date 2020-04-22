@@ -27,7 +27,7 @@ public class TracingPublishers {
     if (span == null) {
       span = noopSpan();
     }
-    log.debug("Lifting {} with span {}", delegate.getClass().getName(), span.getClass().getName());
+    log.debug("Lifting {} - {}", delegate.getClass().getName(), delegate.toString());
 
     // based on Operators.LiftFunction.apply in reactor 3.3.4
     if (delegate instanceof Fuseable) {
