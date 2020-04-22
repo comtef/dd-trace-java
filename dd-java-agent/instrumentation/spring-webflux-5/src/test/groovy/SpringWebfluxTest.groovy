@@ -225,9 +225,6 @@ class SpringWebfluxTest extends AgentTestRunner {
             "$Tags.HTTP_URL" url
             "$Tags.HTTP_METHOD" "GET"
             "$Tags.HTTP_STATUS" 404
-            // Because of the way reactor has been instrumented to propagate errors we end up tagging this
-            // on both spans
-            errorTags(ResponseStatusException, String)
             defaultTags()
           }
         }
@@ -334,9 +331,7 @@ class SpringWebfluxTest extends AgentTestRunner {
             "$Tags.HTTP_URL" url
             "$Tags.HTTP_METHOD" "GET"
             "$Tags.HTTP_STATUS" 500
-            // Because of the way reactor has been instrumented to propagate errors we end up tagging this
-            // on both spans
-            errorTags(RuntimeException, "bad things happen")
+            "error" true
             defaultTags()
           }
         }
