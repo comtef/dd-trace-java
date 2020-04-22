@@ -194,9 +194,22 @@ abstract class HttpClientTest extends AgentTestRunner {
     when:
     def status = doRequest(method, server.address.resolve("/success"), ["is-dd-server": "false"]) {
       runUnderTrace("callback") {
-        // Ensure consistent ordering of traces for assertion.
-        TEST_WRITER.waitForTraces(1)
+        if (clientTraceReportsBeforeCallbackWithoutParent()) {
+          // Ensure consistent ordering of traces for assertion.
+          TEST_WRITER.waitForTraces(1)
+        }
       }
+    }
+    // This is a hack for some async frameworks that hold onto references delaying
+    // reporting of the client span until after the callback trace
+    if (!clientTraceReportsBeforeCallbackWithoutParent()) {
+      TEST_WRITER.sort({ t1, t2 ->
+        if (t1[0].operationName == "callback") {
+          return 1
+        } else {
+          return -1
+        }
+      })
     }
 
     then:
@@ -449,5 +462,11 @@ abstract class HttpClientTest extends AgentTestRunner {
     // FIXME: this hack is here because callback with parent is broken in play-ws when the stream()
     // function is used.  There is no way to stop a test from a derived class hence the flag
     true
+  }
+
+  boolean clientTraceReportsBeforeCallbackWithoutParent() {
+    // This is a hack for some async frameworks that hold onto references delaying
+    // reporting of the client span until after the callback trace
+    return true
   }
 }

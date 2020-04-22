@@ -217,8 +217,6 @@ class SpringWebfluxTest extends AgentTestRunner {
           operationName "netty.request"
           spanType DDSpanTypes.HTTP_SERVER
           parent()
-          // TODO this shouldn't be like this
-          errored true
           tags {
             "$Tags.COMPONENT" "netty"
             "$Tags.SPAN_KIND" Tags.SPAN_KIND_SERVER

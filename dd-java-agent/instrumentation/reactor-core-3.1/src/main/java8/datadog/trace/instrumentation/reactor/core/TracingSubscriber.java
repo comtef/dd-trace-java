@@ -29,7 +29,6 @@ public class TracingSubscriber<T>
   private Subscription subscription;
 
   public TracingSubscriber(final AgentSpan span, final CoreSubscriber<T> delegate) {
-    log.info("Creating subscriber on top of {}", delegate.toString());
     this.delegate = delegate;
     this.span = span;
     downstreamSpan =
@@ -40,19 +39,9 @@ public class TracingSubscriber<T>
       final TraceScope downstreamScope = activeScope();
       downstreamScope.setAsyncPropagation(true);
       continuation.set(activeScope().capture());
-      log.info("Created continuation {}", continuation.get());
     }
 
     context = this.delegate.currentContext().put(AgentSpan.class, this.span);
-  }
-
-  @Override
-  protected void finalize() throws Throwable {
-    if (!continuation.get().getClass().getName().contains("Noop")) {
-      log.error(
-          "Subscriber collected without clearing it's continuation. "
-              + continuation.get().toString());
-    }
   }
 
   @Override
@@ -82,23 +71,40 @@ public class TracingSubscriber<T>
 
   @Override
   public void onError(final Throwable t) {
-    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
-      log.info("onError() {}", toString());
-      scope.setAsyncPropagation(true);
-      span.setError(true);
-      span.addThrowable(t);
-      continuation.getAndSet(noopTraceScope().capture()).activate().close();
-      delegate.onError(t);
+    if (continuation.get() != noopTraceScope().capture()) {
+      try (final TraceScope scope = continuation.getAndSet(noopTraceScope().capture()).activate()) {
+        log.info("onError() {}", toString());
+        scope.setAsyncPropagation(true);
+        span.setError(true);
+        span.addThrowable(t);
+        delegate.onError(t);
+      }
+    } else {
+      try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+        log.info("onError() {}", toString());
+        scope.setAsyncPropagation(true);
+        span.setError(true);
+        span.addThrowable(t);
+        continuation.getAndSet(noopTraceScope().capture()).activate().close();
+        delegate.onError(t);
+      }
     }
   }
 
   @Override
   public void onComplete() {
-    try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
-      log.info("onComplete() {}", toString());
-      scope.setAsyncPropagation(true);
-      continuation.getAndSet(noopTraceScope().capture()).activate().close();
-      delegate.onComplete();
+    if (continuation.get() != noopTraceScope().capture()) {
+      try (final TraceScope scope = continuation.getAndSet(noopTraceScope().capture()).activate()) {
+        log.info("onComplete() {}", toString());
+        scope.setAsyncPropagation(true);
+        delegate.onComplete();
+      }
+    } else {
+      try (final AgentScope scope = activateSpan(downstreamSpan, false)) {
+        log.info("onComplete() {}", toString());
+        scope.setAsyncPropagation(true);
+        delegate.onComplete();
+      }
     }
   }
 
