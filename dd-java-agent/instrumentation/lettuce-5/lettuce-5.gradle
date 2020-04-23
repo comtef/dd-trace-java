@@ -31,6 +31,6 @@ dependencies {
   testCompile group: 'io.lettuce', name: 'lettuce-core', version: '5.0.0.RELEASE'
   testCompile project(':dd-java-agent:instrumentation:reactor-core-3.1')
 
-  // FIXME: Tests need to be updated to support 5.1+
+  // FIXME: Reactive client does not work with 5.1 due to pattern changes in use of reactor
   latestDepTestCompile group: 'io.lettuce', name: 'lettuce-core', version: '5.0.+'
 }
