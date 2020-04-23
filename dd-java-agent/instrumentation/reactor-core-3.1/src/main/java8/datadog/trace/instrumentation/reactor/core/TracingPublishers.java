@@ -14,7 +14,6 @@ import reactor.core.CoreSubscriber;
 import reactor.core.Disposable;
 import reactor.core.Fuseable;
 import reactor.core.publisher.ConnectableFlux;
-import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.GroupedFlux;
 import reactor.core.publisher.Mono;
@@ -23,6 +22,14 @@ import reactor.core.publisher.ParallelFlux;
 public class TracingPublishers {
   private static final Logger log = LoggerFactory.getLogger(TracingPublishers.class);
 
+  /**
+   * TODO add comment specifying why we need to do this ourselves instead of using the function
+   * provided by Reactor in the Operators class
+   *
+   * @param delegate
+   * @param <T>
+   * @return
+   */
   public static <T> Publisher<T> wrap(final Publisher<T> delegate) {
     AgentSpan span = activeSpan();
     if (span == null) {
@@ -63,7 +70,7 @@ public class TracingPublishers {
   }
 
   static <T> boolean shouldWrapSubscriber(final CoreSubscriber<? super T> actual) {
-    if (actual instanceof TracingSubscriber || actual instanceof DirectProcessor) {
+    if (actual instanceof TracingSubscriber) {
       return false;
     }
     return true;
