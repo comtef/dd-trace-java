@@ -64,7 +64,12 @@ public class ContinuableScope implements DDScope, TraceScope {
     event.start();
     toRestore = scopeManager.tlsScope.get();
     scopeManager.tlsScope.set(this);
-    depth = toRestore == null ? 0 : toRestore.depth() + 1;
+    // FIXME in some async places we have to create a lot of scopes, don't increment the depth
+    // unless the span has changed
+    depth =
+        toRestore == null
+            ? 0
+            : toRestore.span() == spanUnderScope ? toRestore.depth() : toRestore.depth() + 1;
     for (final ScopeListener listener : scopeManager.scopeListeners) {
       listener.afterScopeActivated();
     }
