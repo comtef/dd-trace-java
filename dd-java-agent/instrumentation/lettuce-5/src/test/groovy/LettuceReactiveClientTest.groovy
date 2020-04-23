@@ -70,6 +70,7 @@ class LettuceReactiveClientTest extends AgentTestRunner {
 
   def cleanup() {
     connection.close()
+    redisClient.shutdown()
     redisServer.stop()
   }
 
@@ -441,7 +442,7 @@ class LettuceReactiveClientTest extends AgentTestRunner {
       }
     }
   }
-  
+
   def "async subscriber with specific thread pool"() {
     when:
     runUnderTrace("test-parent") {
